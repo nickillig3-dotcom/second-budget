@@ -8,9 +8,10 @@ honest answer is that nobody checks. Second Budget re-derives the allotment from
 the underlying facts, and when it disagrees it says **which stage** of the budget
 it disagrees with and by how much, with the regulation quoted verbatim.
 
-**Status: in progress.** The calculation engine and its validation against
-federal microdata are complete and measured. The agent orchestration is being
-built. Numbers below are reproducible from this repository.
+**Status: in progress.** The calculation engine, its validation against federal
+microdata, and the agent orchestration are built and measured. Still to come: the
+disagreement report and the fair-hearing packet. Every number below is
+reproducible from this repository.
 
 ## What is proven, not asserted
 
@@ -95,6 +96,55 @@ reviewer's finding can rest on facts this file does not expose, and a
 disagreement can equally be the engine's own limitation. Both error cells are
 published above rather than summarised away.
 
+### The constants are proven, not typed in and trusted
+
+The maximum allotment, standard deduction, minimum benefit and excess-shelter cap
+are transcribed from the published schedule (Tables F.3, F.5 and F.6 of the
+FY2024 SNAP QC Technical Documentation, sourced there to USDA FNS) and then
+checked **per household** against the microdata's own columns.
+
+| constant | column | agreement |
+| --- | --- | ---: |
+| minimum benefit | `MINIMUM_BEN` | **100.000%** |
+| excess shelter cap | `SHELCAP` | **100.000%** |
+| standard deduction | `FSSTDDED` | 99.990% |
+| maximum allotment | `BENMAX` | 99.984% |
+
+```bash
+python -m second_budget.validate.layer_c_constants
+```
+
+The direction matters. A table read off the data and then checked against that
+same data is not evidence; two independent expressions of one schedule agreeing
+on 42,438 households is. And every one of the 11 residual households explains
+itself: in each, the recorded constant is this table's own value for a *different*
+household size, so the disagreement is between two columns of the microdata, not
+between the microdata and the table. The report says so rather than rounding it
+away.
+
+**Illinois is not covered, and that is the interesting part.** All 861 Illinois
+households carry a standard deduction exactly $7 below the published contiguous
+figure, at every size band — 861 of 861 is a rule, not noise. No published source
+for the variation has been located, so Illinois is refused rather than having
+`191` copied out of the microdata. A table fitted to the data it is checked
+against has stopped being evidence.
+
+Refusal is a shipped feature with its own tests. Asked about an Illinois
+household, the system says:
+
+> standard deduction is not available for Illinois: every Illinois household in
+> the FY2024 file has a standard deduction $7 below the published contiguous
+> schedule, and no published source for that variation has been located; the
+> engine refuses rather than using an unsourced figure or one copied out of the
+> data it would be checked against.
+
+Alaska is refused for a different reason: it runs three separate benefit
+schedules and the public-use file records only the state, so an Alaskan household
+cannot be mapped to its schedule from the data available. Falling back to the
+contiguous figure would produce an answer that is plausible, wrong, and
+indistinguishable from a right one — which is the failure this project exists to
+attack.
+
 ## How it is built
 
     elicitor  ->  engine  ->  frontier still open?  ->  elicitor  ->  ...
@@ -166,12 +216,12 @@ The agent loop is exercised by a real Strands `Model` implementation
 graph topology, interventions, interrupts and the exact model-call count are all
 assertable offline.
 
-## Coverage, and what it refuses
+## Coverage
 
-FY2024, and the 49 jurisdictions on the contiguous benefit schedule. Alaska,
-Hawaii, Guam and the Virgin Islands run separate maximum-allotment and
-minimum-benefit tables; the engine refuses for them rather than guessing.
-Refusal is a shipped feature with its own tests, not an unhandled case.
+FY2024, and the 48 jurisdictions on the contiguous benefit schedule minus
+Illinois. Alaska, Hawaii, Guam and the Virgin Islands run separate schedules;
+Illinois is out for the reason above. The engine refuses for all of them and says
+which constant is missing and where the published figure lives.
 
 ## Data
 
