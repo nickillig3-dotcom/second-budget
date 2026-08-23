@@ -36,6 +36,7 @@ from strands.telemetry.metrics import EventLoopMetrics
 from strands.types.event_loop import Metrics, Usage
 
 from ..engine.budget import BudgetResult, Household, compute
+from ..engine.rounding import medical_deduction
 from ..engine.certificate import Certificate, certify
 from ..facts import FactId, FactLedger
 from ..frontier import is_closed, missing_facts
@@ -110,8 +111,15 @@ class BudgetSolver(MultiAgentBase):
             float(value(FactId.SHELTER_COST)) + float(value(FactId.UTILITY_ALLOWANCE))
         )
         elderly_or_disabled = bool(value(FactId.ELDERLY_OR_DISABLED))
+        # The household reports what it SPENT; the budget wants the deductible
+        # part. Only the amount above $35 counts, and only when an elderly or
+        # disabled member is present. Applying that here rather than asking the
+        # elicitor for a net figure keeps the rule in code -- a model that nets a
+        # threshold in its head is computing, and computing is not its job.
         medical = (
-            float(value(FactId.MEDICAL_EXPENSES)) if elderly_or_disabled else 0.0
+            medical_deduction(float(value(FactId.MEDICAL_EXPENSES)))
+            if elderly_or_disabled
+            else 0.0
         )
         return compute(
             Household(

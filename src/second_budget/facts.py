@@ -49,7 +49,9 @@ class FactId(str, enum.Enum):
     UNEARNED_INCOME = "income.unearned"
     ELDERLY_OR_DISABLED = "household.elderly_or_disabled"
     DEPENDENT_CARE = "expenses.dependent_care"
-    MEDICAL_EXPENSES = "expenses.medical"
+    # What the household actually SPENT, gross. The engine applies the $35
+    # threshold; the elicitor must never net it itself.
+    MEDICAL_EXPENSES = "expenses.medical_gross"
     CHILD_SUPPORT_PAID = "expenses.child_support"
     SHELTER_COST = "shelter.cost"
     UTILITY_ALLOWANCE = "shelter.utility_allowance"

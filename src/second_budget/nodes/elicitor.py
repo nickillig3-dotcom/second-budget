@@ -38,7 +38,10 @@ Rules you cannot talk your way around:
                        reading is the one failure that cannot be caught later.
 3. Record only what you were actually told. If the household did not mention
    child support, that is a fact you do not have -- not a zero.
-4. You will be told which facts are still missing. Ask about those, nothing else.
+4. Record amounts exactly as the household states them. Never subtract a
+   threshold, never annualise, never prorate -- the engine applies every such
+   rule and it applies them the way the regulation words them.
+5. You will be told which facts are still missing. Ask about those, nothing else.
 """
 
 

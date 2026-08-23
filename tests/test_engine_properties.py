@@ -163,3 +163,69 @@ def test_the_three_rounding_rules_point_in_two_directions() -> None:
     """
     assert earned_income_deduction(1009) == 201        # 201.8 truncated down
     assert household_share(1009) == 303                # 302.7 rounded up
+
+
+def test_only_medical_expenses_above_the_threshold_are_deductible() -> None:
+    """The rule sits in code because the two sources disagree about what a
+    "medical expense" is.
+
+    The federal microdata reports the figure already net of the $35 threshold
+    (the codebook calls FSMEDEXP "allowable medical expenses in excess of $35",
+    and FSMEDDED = MAX(0, FSMEDEXP) holds on 99.62% of households with any). A
+    household says "she spent sixty dollars on her inhaler", which is gross.
+    Leaving that conversion to the model would be asking it to compute.
+    """
+    from second_budget.engine.rounding import MEDICAL_THRESHOLD, medical_deduction
+
+    assert MEDICAL_THRESHOLD == 35.0
+    assert medical_deduction(60) == 25.0
+    assert medical_deduction(35) == 0.0
+    assert medical_deduction(30) == 0.0
+    assert medical_deduction(0) == 0.0
+
+
+def test_the_solver_node_applies_medical_eligibility_not_the_engine() -> None:
+    """Two different rules, deliberately in two different places.
+
+    ``compute`` takes a medical *deduction* and uses it, because the federal
+    replay path hands it one directly. Whether a household is entitled to a
+    medical deduction at all, and the conversion from gross spending to a
+    deduction, belong to the step that turns elicited facts into a budget --
+    which is the solver node.
+    """
+    import asyncio
+
+    from second_budget.facts import Fact, FactId, FactLedger, Provenance
+    from second_budget.nodes.solver_node import CONSTANTS_KEY, LEDGER_KEY, RESULT_KEY, BudgetSolver
+
+    def ledger_for(*, elderly: bool) -> FactLedger:
+        ledger = FactLedger()
+        for fact_id, value in (
+            (FactId.HOUSEHOLD_SIZE, 2), (FactId.STATE, "IL"),
+            (FactId.BENEFIT_MONTH, "2024-06"), (FactId.EARNED_INCOME, 1200.0),
+            (FactId.UNEARNED_INCOME, 0.0), (FactId.ELDERLY_OR_DISABLED, elderly),
+            (FactId.CHILD_SUPPORT_PAID, 0.0), (FactId.DEPENDENT_CARE, 0.0),
+            (FactId.HOMELESS_STATUS, False), (FactId.SHELTER_COST, 900.0),
+            (FactId.UTILITY_ALLOWANCE, 0.0), (FactId.STATE_DETERMINED_BENEFIT, 210.0),
+            (FactId.MEDICAL_EXPENSES, 60.0),
+        ):
+            ledger.record(Fact(id=fact_id, value=value, provenance=Provenance.FROM_NARRATIVE))
+        return ledger
+
+    def run_solver(*, elderly: bool):
+        state = {
+            LEDGER_KEY: ledger_for(elderly=elderly),
+            CONSTANTS_KEY: {"standard_deduction": 204.0, "shelter_cap": 672.0,
+                            "max_allotment": 535, "minimum_benefit": 23,
+                            "homeless_shelter_deduction": 180.0},
+        }
+        asyncio.run(BudgetSolver().invoke_async("go", state))
+        return state[RESULT_KEY]
+
+    eligible = run_solver(elderly=True)
+    not_eligible = run_solver(elderly=False)
+
+    # $60 spent, $35 threshold -> $25 deductible, and only for the eligible one.
+    assert eligible.stage("medical_deduction").value == 25.0
+    assert not_eligible.stage("medical_deduction").value == 0.0
+    assert eligible.allotment > not_eligible.allotment

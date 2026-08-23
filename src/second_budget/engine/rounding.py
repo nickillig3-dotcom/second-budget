@@ -27,6 +27,11 @@ import math
 CFR_EARNED_DEDUCTION = "7 CFR 273.9(d)(2)"
 CFR_SHELTER_HALF = "7 CFR 273.9(d)(6)(ii)"
 CFR_ALLOTMENT = "7 CFR 273.10(e)(2)(ii)(C)"
+CFR_MEDICAL = "7 CFR 273.9(d)(3)"
+
+#: Only medical expenses ABOVE this monthly threshold are deductible, and only
+#: for elderly or disabled members.
+MEDICAL_THRESHOLD = 35.0
 
 
 def half_up(value: float) -> int:
@@ -82,3 +87,25 @@ def household_share(net_income: float) -> int:
     31
     """
     return math.ceil(0.30 * net_income)
+
+
+def medical_deduction(gross_medical_expenses: float) -> float:
+    """The deductible part of a household's medical expenses.
+
+    Only the amount **above $35 a month** is deductible, and only for elderly or
+    disabled members (7 CFR 273.9(d)(3)).
+
+    This exists because of where the two numbers come from. The federal
+    microdata reports ``FSMEDEXP`` already net of the threshold -- the codebook
+    calls it "allowable medical expenses in excess of $35" -- so replay feeds the
+    engine a deduction. A household, on the other hand, says "she spent sixty
+    dollars on her inhaler", which is a *gross* expense. Converting one to the
+    other is a rule in the regulation, so it lives here rather than being left to
+    the model to do in its head.
+
+    >>> medical_deduction(60)
+    25.0
+    >>> medical_deduction(30)
+    0.0
+    """
+    return max(0.0, gross_medical_expenses - MEDICAL_THRESHOLD)
