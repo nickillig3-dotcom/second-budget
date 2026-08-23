@@ -1,0 +1,132 @@
+"""Where a human belongs in the loop, and where a model call is wasted.
+
+Two hooks, each answering a question the agent loop cannot answer for itself.
+
+``BatchConfirmation`` -- a navigator confirms an eleven-fact batch in **one**
+gate, not eleven prompts. This has to live at the batch level, because
+``Confirm`` returned from an intervention produces *sequential* interrupt rounds:
+several confirms in one dispatch cost several round-trips, verified. The batch
+event exists precisely for this.
+
+``HaltWhenFrontierCloses`` -- when the recorded facts close the frontier, stop.
+Without it the loop makes one more model call whose only possible output is "I
+have everything", which is a paid round-trip to learn something a Python
+predicate already knew.
+
+Two sharp edges, both measured:
+
+* ``AfterToolsEvent`` does **not** fire when ``BeforeToolsEvent`` raised an
+  interrupt -- the interrupt check at ``event_loop/event_loop.py:796`` returns
+  before the ``try/finally`` that dispatches it. Cleanup placed in
+  ``AfterToolsEvent`` is skipped on exactly the path a human just approved.
+* Interrupt names collide by **name**, not by id, within one dispatch
+  (``hooks/registry.py:337``). Namespacing the name is what keeps two gates on
+  one batch from raising ``ValueError``.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from strands.hooks import AfterToolsEvent, BeforeToolsEvent, HookProvider, HookRegistry
+
+from ..facts import FactId, FactLedger, Provenance
+from ..frontier import is_closed
+
+INTERRUPT_NAME = "second-budget:confirm-fact-batch"
+
+
+def _fact_calls(event: BeforeToolsEvent, tool_name: str) -> list[dict[str, Any]]:
+    """The tool uses in this batch that propose a fact.
+
+    ``BeforeToolsEvent`` carries the assistant ``message``, not a ready-made list
+    of tool uses -- the batch is whatever ``toolUse`` blocks that message
+    contains (``hooks/events.py``). Reading it out here keeps that shape in one
+    place instead of spread across two hooks.
+    """
+    return [
+        block["toolUse"]
+        for block in event.message.get("content", [])
+        if isinstance(block, dict)
+        and "toolUse" in block
+        and block["toolUse"].get("name") == tool_name
+    ]
+
+
+class BatchConfirmation(HookProvider):
+    """One approval gate for a whole batch of proposed facts.
+
+    The payload separates facts by provenance so the navigator can see at a
+    glance which ones the model *inferred* rather than read -- those are the
+    ones worth their attention, and they are visually separated for that reason.
+
+    Resuming with a list of rejected fact ids removes them from the ledger,
+    which re-opens the frontier and sends the graph round again. Approval is
+    therefore not a formality: a partial rejection changes what happens next.
+    """
+
+    def __init__(self, ledger: FactLedger, *, navigator: str, tool_name: str = "record_fact") -> None:
+        self.ledger = ledger
+        self.navigator = navigator
+        self.tool_name = tool_name
+        self.batches_presented = 0
+        self.rejected: list[str] = []
+
+    def register_hooks(self, registry: HookRegistry, **_: Any) -> None:
+        registry.add_callback(BeforeToolsEvent, self._confirm_batch)
+
+    def _confirm_batch(self, event: BeforeToolsEvent) -> None:
+        proposed = _fact_calls(event, self.tool_name)
+        if not proposed:
+            return
+
+        self.batches_presented += 1
+        payload = {
+            "facts": [
+                {
+                    "fact_id": use["input"].get("fact_id"),
+                    "value": use["input"].get("value"),
+                    "provenance": use["input"].get("provenance"),
+                    "source": use["input"].get("source", ""),
+                    # The navigator's eye goes here first, and the UI renders it
+                    # as a separate class.
+                    "needs_scrutiny": use["input"].get("provenance") == Provenance.INFERRED.value,
+                }
+                for use in proposed
+            ],
+        }
+
+        decision = event.interrupt(name=INTERRUPT_NAME, reason=payload)
+
+        rejected = set(decision.get("rejected", []) if isinstance(decision, dict) else [])
+        self.rejected.extend(sorted(rejected))
+        if rejected:
+            event.cancel = (
+                "The navigator rejected: " + ", ".join(sorted(rejected))
+                + ". Do not record these as stated; ask the household again."
+            )
+
+
+class HaltWhenFrontierCloses(HookProvider):
+    """Stop the turn the moment the engine has everything it needs.
+
+    Asserted in tests on the scripted model's call counter, because "the loop
+    halted" is otherwise indistinguishable from "the model happened to stop".
+    """
+
+    def __init__(self, ledger: FactLedger) -> None:
+        self.ledger = ledger
+        self.halted = False
+
+    def register_hooks(self, registry: HookRegistry, **_: Any) -> None:
+        registry.add_callback(AfterToolsEvent, self._halt_if_closed)
+
+    def _halt_if_closed(self, event: AfterToolsEvent) -> None:
+        known: dict[FactId, object] = {
+            fact_id: self.ledger.value(fact_id) for fact_id in self.ledger.established
+        }
+        if is_closed(known):
+            self.halted = True
+            event.end_turn = (
+                "Every fact the budget needs is recorded. Handing off to the engine."
+            )

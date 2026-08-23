@@ -12,7 +12,12 @@ import random
 import pytest
 
 from second_budget.engine.allotment import allotment
-from second_budget.engine.rounding import household_share
+from second_budget.engine.rounding import (
+    earned_income_deduction,
+    half_of_adjusted_income,
+    half_up,
+    household_share,
+)
 
 
 @pytest.mark.parametrize(
@@ -116,3 +121,45 @@ def test_the_cfr_reference_names_the_minimum_rule_only_when_it_fired() -> None:
     assert "273.10(e)(2)(vi)" in " ".join(floored.cfr_refs)
     assert "273.10(e)(2)(vi)" not in " ".join(plain.cfr_refs)
     assert all("273.10(e)(2)(ii)(C)" in " ".join(r.cfr_refs) for r in (floored, plain))
+
+
+# -- the rounding rules, each measured against the microdata ----------------
+
+
+def test_python_round_is_not_the_round_in_the_regulation() -> None:
+    """Banker's rounding scores 87.487% where half-up scores 100.000%.
+
+    5,304 households wrong by a dollar, with no exception and nothing in the
+    output to suggest it. This is the single most expensive default in the
+    standard library for this problem.
+    """
+    assert [half_up(x) for x in (0.5, 1.5, 2.5, 3.5)] == [1, 2, 3, 4]
+    assert [round(x) for x in (0.5, 1.5, 2.5, 3.5)] == [0, 2, 2, 4]
+
+
+@pytest.mark.parametrize(
+    ("earned", "expected"),
+    [(0, 0), (100, 20), (1000, 200), (1004, 200), (1009, 201), (5, 1)],
+)
+def test_the_earned_income_deduction_truncates(earned, expected) -> None:
+    """floor matches 99.955% of households; rounding to nearest matches 90.059%."""
+    assert earned_income_deduction(earned) == expected
+
+
+def test_adjusted_income_is_rounded_before_it_is_halved() -> None:
+    """Halving first and rounding after scores 74.502%. Order is the whole rule."""
+    # 1001.4 -> half_up -> 1001 -> /2 -> 500.5, a legitimate half-dollar result.
+    assert half_of_adjusted_income(1001.4) == 500.5
+    # Negative adjusted income cannot produce a negative half.
+    assert half_of_adjusted_income(-50) == 0.0
+
+
+def test_the_three_rounding_rules_point_in_two_directions() -> None:
+    """Worth stating plainly: the statute does not round consistently.
+
+    The earned income deduction truncates down, which lowers the deduction. The
+    household's share rounds up, which lowers the benefit. Both defaults fall
+    the same way for the household, and neither is the obvious reading.
+    """
+    assert earned_income_deduction(1009) == 201        # 201.8 truncated down
+    assert household_share(1009) == 303                # 302.7 rounded up
