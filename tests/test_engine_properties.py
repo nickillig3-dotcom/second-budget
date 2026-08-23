@@ -118,16 +118,16 @@ def test_the_cfr_reference_names_the_minimum_rule_only_when_it_fired() -> None:
     plain = allotment(
         max_allotment=291, net_income=100, household_size=1, minimum_benefit=23
     )
-    assert "273.10(e)(2)(vi)" in " ".join(floored.cfr_refs)
-    assert "273.10(e)(2)(vi)" not in " ".join(plain.cfr_refs)
-    assert all("273.10(e)(2)(ii)(C)" in " ".join(r.cfr_refs) for r in (floored, plain))
+    assert "273.10(e)(2)(ii)(C)" in " ".join(floored.cfr_refs)
+    assert "273.10(e)(2)(ii)(C)" not in " ".join(plain.cfr_refs)
+    assert all("273.10(e)(2)(ii)(A)" in " ".join(r.cfr_refs) for r in (floored, plain))
 
 
 # -- the rounding rules, each measured against the microdata ----------------
 
 
 def test_python_round_is_not_the_round_in_the_regulation() -> None:
-    """Banker's rounding scores 87.487% where half-up scores 100.000%.
+    """Banker's rounding scores 87.482% where half-up scores 100.000%.
 
     5,304 households wrong by a dollar, with no exception and nothing in the
     output to suggest it. This is the single most expensive default in the

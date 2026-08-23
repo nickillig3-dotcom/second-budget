@@ -5,7 +5,7 @@ worth a dollar to a household every month:
 
   * the earned income deduction is **truncated down**   (7 CFR 273.9(d)(2))
   * half of adjusted income is rounded **half-up**      (7 CFR 273.9(d)(6)(ii))
-  * the household's 30% share is rounded **up**         (7 CFR 273.10(e)(2)(ii)(C))
+  * the household's 30% share is rounded **up**         (7 CFR 273.10(e)(2)(ii)(A))
 
 They are collected here rather than inlined for two reasons. The first is that a
 reader can see all three at once and check them against the regulation. The
@@ -15,7 +15,7 @@ rather than merely asserted.
 
 **Python's built-in ``round`` is not the ``round`` in the regulation.** It is
 banker's rounding (half-to-even), so ``round(0.5) == 0`` and ``round(1.5) == 2``.
-Using it for the half-of-adjusted-income step scores 87.487% against the
+Using it for the half-of-adjusted-income step scores 87.482% against the
 microdata instead of 100.000% -- 5,304 households wrong by a dollar, silently,
 with no exception and no clue in the output. See ``half_up``.
 """
@@ -26,7 +26,7 @@ import math
 
 CFR_EARNED_DEDUCTION = "7 CFR 273.9(d)(2)"
 CFR_SHELTER_HALF = "7 CFR 273.9(d)(6)(ii)"
-CFR_ALLOTMENT = "7 CFR 273.10(e)(2)(ii)(C)"
+CFR_ALLOTMENT = "7 CFR 273.10(e)(2)(ii)(A)"
 CFR_MEDICAL = "7 CFR 273.9(d)(3)"
 
 #: Only medical expenses ABOVE this monthly threshold are deductible, and only

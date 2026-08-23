@@ -44,14 +44,14 @@ python -m second_budget.validate.layer_a_allotment
 Every rule below was found by demanding an empty residual histogram against real
 records, not by reading the regulation more carefully. A flat mismatch rate says
 nothing; a residual that clusters on one value is a specific rule missing from
-the code, and it names itself. A naive allotment formula scores 91.287%.
+the code, and it names itself. A naive allotment formula scores 90.957%.
 
-1. **−23 on 3,259 households.** The minimum benefit. Measured, not assumed: it
+1. **−23 on 3,257 households.** The minimum benefit. Measured, not assumed: it
    applies only to household sizes 1 and 2, and it applies **even when the
    computed allotment is zero**, not merely when it is small. Of the affected
    households, every one has a computed allotment below the floor and none has
    one at or above it.
-2. **The rounding sits before the subtraction.** 7 CFR 273.10(e)(2)(ii)(C)
+2. **The rounding sits before the subtraction.** 7 CFR 273.10(e)(2)(ii)(A)
    requires the household's 30% share to be rounded *up to the next whole dollar
    and then subtracted*, not the result rounded afterwards.
 3. **The earned income deduction truncates.** 20% of earned income, rounded
@@ -61,8 +61,9 @@ the code, and it names itself. A naive allotment formula scores 91.287%.
    scores 74.502%.
 5. **`round()` in Python is not `round()` in the regulation.** The built-in is
    banker's rounding, so `round(0.5) == 0`. Using it for the half-of-adjusted-
-   income step scores **87.487%** instead of 100.000% -- 5,304 households wrong
-   by a dollar, with no exception and nothing in the output to suggest it.
+   income step scores **87.482%** on the excess shelter deduction where half-up
+   scores 99.995% -- exactly 5,304 households wrong by a dollar, with no
+   exception and nothing in the output to suggest it.
 6. **A homeless household's flat shelter deduction replaces the excess-shelter
    stage rather than adding to it.** Implementing only half of that rule cost
    exactly `ceil(0.30 x 180) = 54` dollars on 38 households -- which is how it

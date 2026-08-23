@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 from .rounding import household_share
 
-CFR_MINIMUM = "7 CFR 273.10(e)(2)(vi)"
+CFR_MINIMUM = "7 CFR 273.10(e)(2)(ii)(C)"
 
 
 @dataclass(frozen=True)
@@ -46,5 +46,5 @@ def allotment(
         allotment=value,
         raw=raw,
         floor_applied=floored,
-        cfr_refs=("7 CFR 273.10(e)(2)(ii)(C)",) + ((CFR_MINIMUM,) if floored else ()),
+        cfr_refs=("7 CFR 273.10(e)(2)(ii)(A)",) + ((CFR_MINIMUM,) if floored else ()),
     )
