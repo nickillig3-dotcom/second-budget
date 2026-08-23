@@ -2,11 +2,18 @@
 
 Two hooks, each answering a question the agent loop cannot answer for itself.
 
-``BatchConfirmation`` -- a navigator confirms an eleven-fact batch in **one**
-gate, not eleven prompts. This has to live at the batch level, because
-``Confirm`` returned from an intervention produces *sequential* interrupt rounds:
-several confirms in one dispatch cost several round-trips, verified. The batch
-event exists precisely for this.
+``BatchConfirmation`` -- a navigator confirms a whole fact batch in **one**
+gate, not one prompt per fact.
+
+Why this lives at the batch level rather than in an intervention: a ``Confirm``
+returned from ``before_tool_call`` fires once per tool call and its payload
+carries only *that* call. Three proposed facts give three interrupts in one
+round -- measured, and worth stating precisely because an earlier version of
+this comment claimed they *serialise* into three rounds, which does not
+reproduce. Three separate payloads is still the wrong shape for a human: the
+navigator wants to see the batch together, weigh the inferred facts against the
+read ones, and reject selectively. ``BeforeToolsEvent`` is the only place where
+the whole batch exists as one object.
 
 ``HaltWhenFrontierCloses`` -- when the recorded facts close the frontier, stop.
 Without it the loop makes one more model call whose only possible output is "I

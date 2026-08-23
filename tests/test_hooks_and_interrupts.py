@@ -173,3 +173,41 @@ def test_two_different_batches_get_two_different_gates() -> None:
 
     assert _batch_key(first) == _batch_key(dict(first))   # stable across a resume
     assert _batch_key(first) != _batch_key(second)        # distinct between batches
+
+
+def test_several_confirms_arrive_in_one_round_not_several() -> None:
+    """Corrects a claim this repository used to make in its own docstrings.
+
+    An intervention-level ``Confirm`` fires once per tool call, so three
+    proposed facts give **one** interrupt round carrying three interrupts -- not
+    three sequential rounds, which is what the comments said until it was
+    measured.
+
+    The batch gate still belongs in the hook layer, but for a different reason:
+    three separate payloads is the wrong shape for a human, who wants to see the
+    batch together and reject selectively.
+    """
+    from strands import InterventionHandler
+    from strands.interventions import Confirm
+
+    class ConfirmEach(InterventionHandler):
+        name = "confirm-each"
+
+        def before_tool_call(self, event, **_):
+            return Confirm(reason={"fact_id": event.tool_use["input"]["fact_id"]})
+
+    ledger = FactLedger()
+    model = ScriptedModel([
+        Turn.tools(_call(FactId.HOUSEHOLD_SIZE, 2),
+                   _call(FactId.EARNED_INCOME, 1200.0),
+                   _call(FactId.STATE, "Ohio")),
+        Turn.say("done"),
+    ])
+    agent = Agent(model=model, tools=build_ledger_tools(ledger),
+                  interventions=[ConfirmEach()], callback_handler=None)
+
+    paused = agent("Record them.")
+
+    assert paused.stop_reason == "interrupt"
+    assert len(paused.interrupts) == 3, "one round carrying three, not three rounds"
+    assert model.calls == 1

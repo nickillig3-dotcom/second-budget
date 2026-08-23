@@ -100,11 +100,13 @@ class InferredFactGate(InterventionHandler):
     Returns ``Confirm`` with no response, which drops into the interrupt system
     and pauses the loop for the navigator.
 
-    Two sharp edges, both verified: ``Confirm(response=None)`` means *ask a
-    human*, not *deny* -- a handler that computes ``response=lookup()`` and gets
-    ``None`` back pauses rather than blocks. And several ``Confirm``s in one
-    dispatch produce **sequential** interrupt rounds, not one batch, which is why
-    batching lives in the hook layer instead (see ``hooks.py``).
+    Two sharp edges. ``Confirm(response=None)`` means *ask a human*, not *deny*
+    -- a handler that computes ``response=lookup()`` and gets ``None`` back
+    pauses rather than blocks. And a ``Confirm`` here fires once per tool call,
+    carrying only that call's payload: three proposed facts give three
+    interrupts in one round. That is three separate questions rather than one
+    batch a navigator can weigh together, which is why the batch gate lives in
+    the hook layer instead (see ``hooks.py``).
     """
 
     name = "inferred-facts-need-a-signature"
