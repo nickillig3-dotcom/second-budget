@@ -1,0 +1,136 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 720" width="1180" height="720" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
+  <title>Second Budget architecture</title>
+  <desc>The elicitation loop: a cyclic Strands graph in which a deterministic budget engine is a peer node rather than a tool, gated by interventions and a human confirmation batch.</desc>
+
+  <style>
+    .bg    { fill: #ffffff; }
+    .title { font-size: 21px; font-weight: 700; fill: #12181f; }
+    .sub   { font-size: 13.5px; fill: #55606d; }
+    .lane  { fill: #f6f8fa; stroke: #dfe4ea; stroke-width: 1; rx: 10; }
+    .lanel { font-size: 11px; font-weight: 700; fill: #8b95a1; letter-spacing: 1.4px; }
+    .agent { fill: #eef4fd; stroke: #4c7fd4; stroke-width: 1.6; rx: 9; }
+    .engine{ fill: #eaf6ee; stroke: #2e8b57; stroke-width: 2.4; rx: 9; }
+    .gate  { fill: #fdf2ee; stroke: #c8623a; stroke-width: 1.6; rx: 9; }
+    .human { fill: #fdf7e3; stroke: #b8912a; stroke-width: 1.6; rx: 9; }
+    .store { fill: #f4f1fb; stroke: #6f5bb5; stroke-width: 1.6; rx: 9; }
+    .nname { font-size: 14.5px; font-weight: 650; fill: #12181f; }
+    .nsub  { font-size: 11.5px; fill: #55606d; }
+    .mono  { font-size: 11px; fill: #445; font-family: "JetBrains Mono", Consolas, monospace; }
+    .edge  { stroke: #6b7684; stroke-width: 1.8; fill: none; marker-end: url(#a); }
+    .cond  { stroke: #2e8b57; stroke-width: 1.8; fill: none; marker-end: url(#ag); stroke-dasharray: 6 4; }
+    .elab  { font-size: 11px; fill: #414a55; }
+    .clab  { font-size: 11px; fill: #2e8b57; font-weight: 600; }
+    .note  { font-size: 11.5px; fill: #55606d; }
+    .keyt  { font-size: 11.5px; fill: #12181f; }
+  </style>
+
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6b7684"/>
+    </marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2e8b57"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1180" height="720"/>
+
+  <text class="title" x="40" y="44">Second Budget &#8212; an independent recomputation of a household&#8217;s SNAP determination</text>
+  <text class="sub"   x="40" y="68">Strands Agents SDK 1.53 on Amazon Bedrock. The model elicits facts and drafts prose. It never computes.</text>
+
+  <!-- lanes -->
+  <rect class="lane" x="40"  y="96" width="700" height="392"/>
+  <text class="lanel" x="58" y="118">CYCLIC GRAPH &#183; GraphBuilder, max 14 node executions</text>
+
+  <rect class="lane" x="764" y="96" width="376" height="392"/>
+  <text class="lanel" x="782" y="118">CONTROL PLANE &#183; what the model cannot do</text>
+
+  <!-- elicitor -->
+  <rect class="agent" x="72" y="146" width="230" height="86"/>
+  <text class="nname" x="88" y="172">elicitor &#8212; Agent</text>
+  <text class="nsub"  x="88" y="192">turns what a household said</text>
+  <text class="nsub"  x="88" y="208">into typed, attributed facts</text>
+  <text class="mono"  x="88" y="224">reset_on_revisit(True)</text>
+
+  <!-- engine -->
+  <rect class="engine" x="72" y="300" width="230" height="102"/>
+  <text class="nname" x="88" y="326">engine &#8212; MultiAgentBase</text>
+  <text class="nsub"  x="88" y="346">the statute as arithmetic.</text>
+  <text class="nsub"  x="88" y="362">No model inside it, and not a</text>
+  <text class="nsub"  x="88" y="378">@tool the model could decline.</text>
+  <text class="mono"  x="88" y="394">99.993% vs 42,388 records</text>
+
+  <!-- drafter -->
+  <rect class="agent" x="452" y="300" width="256" height="102"/>
+  <text class="nname" x="468" y="326">drafter &#8212; Agent</text>
+  <text class="nsub"  x="468" y="346">writes the fair-hearing request.</text>
+  <text class="nsub"  x="468" y="362">Every figure and every quotation</text>
+  <text class="nsub"  x="468" y="378">must pass a gate to be written.</text>
+
+  <!-- fact ledger -->
+  <rect class="store" x="452" y="146" width="256" height="86"/>
+  <text class="nname" x="468" y="172">fact ledger + frontier</text>
+  <text class="nsub"  x="468" y="192">which fact is needed next is</text>
+  <text class="nsub"  x="468" y="208">computed, not chosen. Travels in</text>
+  <text class="mono"  x="468" y="224">invocation_state, not on edges</text>
+
+  <!-- edges within the graph -->
+  <path class="edge" d="M187,232 L187,300"/>
+  <text class="elab" x="196" y="270">facts recorded</text>
+
+  <path class="cond" d="M302,340 C 360,340 380,340 452,340"/>
+  <text class="clab" x="318" y="332">frontier closed</text>
+
+  <path class="cond" d="M72,352 C 40,352 40,190 72,190"/>
+  <text class="clab" x="66" y="262" text-anchor="end" transform="rotate(-90 66 262)">frontier still open &#8212; loop</text>
+
+  <path class="edge" d="M302,190 L452,190"/>
+  <path class="edge" d="M580,232 L580,300" />
+
+  <!-- human gate -->
+  <rect class="human" x="72" y="416" width="636" height="54"/>
+  <text class="nname" x="88" y="440">human gate &#8212; BeforeToolsEvent.interrupt</text>
+  <text class="nsub"  x="88" y="458">a navigator confirms the whole batch in one pause; facts the model inferred are marked. Rejecting one re-opens the frontier.</text>
+
+  <path class="edge" d="M330,220 C 380,260 400,400 400,416"/>
+  <text class="elab" x="352" y="270">proposed facts</text>
+
+  <!-- control plane boxes -->
+  <rect class="gate" x="792" y="146" width="320" height="80"/>
+  <text class="nname" x="808" y="170">NumbersGate</text>
+  <text class="nsub"  x="808" y="190">a figure absent from the engine&#8217;s frozen</text>
+  <text class="nsub"  x="808" y="206">certificate is denied. Set membership.</text>
+  <text class="mono"  x="808" y="221">before_tool_call &#183; on_error=&quot;deny&quot;</text>
+
+  <rect class="gate" x="792" y="242" width="320" height="80"/>
+  <text class="nname" x="808" y="266">CitationGate</text>
+  <text class="nsub"  x="808" y="286">a quote that is not a byte-identical span</text>
+  <text class="nsub"  x="808" y="302">of the cited section is denied.</text>
+  <text class="mono"  x="808" y="317">before_tool_call &#183; on_error=&quot;deny&quot;</text>
+
+  <rect class="store" x="792" y="338" width="320" height="80"/>
+  <text class="nname" x="808" y="362">7 CFR 273 index &#8212; MemoryStore</text>
+  <text class="nsub"  x="808" y="382">read-only, section-attributed, fails closed:</text>
+  <text class="nsub"  x="808" y="398">startup canary, per-search latch, health</text>
+  <text class="mono"  x="808" y="413">assertion before any quotation</text>
+
+  <rect class="human" x="792" y="430" width="320" height="44"/>
+  <text class="nsub"  x="808" y="450">Gates sit on before_tool_call: a Guide at</text>
+  <text class="nsub"  x="808" y="466">after_model_call does not survive a session restore.</text>
+
+  <path class="edge" d="M708,340 L792,300"/>
+  <path class="edge" d="M708,330 L792,190"/>
+
+  <!-- output -->
+  <rect class="lane" x="40" y="512" width="1100" height="86"/>
+  <text class="lanel" x="58" y="534">OUTPUT</text>
+  <text class="keyt"  x="58" y="558">The notice says $210. The engine derives $473. For the notice to be correct, unearned income would have to be $584.41 higher than stated.</text>
+  <text class="note"  x="58" y="578">Inputs that cannot account for the difference at any permitted value are omitted rather than shown with an impossible figure. Every line is</text>
+  <text class="note"  x="58" y="592">checked by recomputing the budget with the value it names. A reconciliation is not an accusation.</text>
+
+  <!-- footer facts -->
+  <text class="note" x="40" y="636">148 tests pass in under two seconds with no AWS credentials in the environment, driven by a real Strands Model provider that replays a script</text>
+  <text class="note" x="40" y="654">instead of calling a backend &#8212; so graph topology, every Deny, every interrupt round and the exact model-call count are all assertable offline.</text>
+  <text class="note" x="40" y="678">Engine validated by exact replay against 42,388 real USDA quality-control households. Constants proven against the file&#8217;s own columns, or refused.</text>
+  <text class="note" x="40" y="696">Coverage: FY2024, the contiguous benefit schedule minus Illinois. Everything outside it is refused with the missing constant named.</text>
+</svg>

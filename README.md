@@ -147,6 +147,10 @@ attack.
 
 ## How it is built
 
+![Architecture](docs/architecture.png)
+
+
+
     elicitor  ->  engine  ->  frontier still open?  ->  elicitor  ->  ...
                      |
                      +-------- frontier closed ---->  drafter
@@ -201,13 +205,31 @@ rather than taken from documentation.
    later, guidance-based control is not weaker -- it is absent. Every hard gate
    here sits on `before_tool_call`.
 
+## Using it
+
+```bash
+pip install -e ".[dev]"
+
+sb --backend scripted check                                   # is everything wired up
+sb --backend scripted open --narrative examples/household.txt # elicit, compute, compare
+sb packet --out request.md                                    # render the filing
+sb validate --full                                            # reproduce every number
+```
+
+`--backend scripted` runs the whole pipeline with no credentials and no network,
+and says so on screen every time. Drop it to run against Amazon Bedrock.
+
+`sb open` pauses once per batch of proposed facts and shows them for
+confirmation, with anything the model *inferred* marked in a separate colour.
+Nothing enters the budget until a human approves it, and rejecting one fact
+re-opens the frontier and sends the graph round again.
+
 ## Running the tests
 
 The full suite runs on a committed 2,000-household sample with **no download, no
 AWS account, and no credentials of any kind**:
 
 ```bash
-pip install -e ".[dev]"
 pytest -q
 ```
 

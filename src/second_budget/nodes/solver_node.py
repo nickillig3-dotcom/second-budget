@@ -49,6 +49,10 @@ RESULT_KEY = "second_budget.result"
 FRONTIER_KEY = "second_budget.frontier"
 CERTIFICATE_KEY = "second_budget.certificate"
 REFUSAL_KEY = "second_budget.refusal"
+#: The exact Household the engine computed from. Downstream code reads this
+#: rather than reconstructing one from the rendered stages -- a reconstruction
+#: would be a second, silently divergent implementation of the same mapping.
+HOUSEHOLD_KEY = "second_budget.household"
 
 
 class InsufficientFacts(Exception):
@@ -139,8 +143,7 @@ class BudgetSolver(MultiAgentBase):
             else 0.0
         )
         size = int(value(FactId.HOUSEHOLD_SIZE))
-        return compute(
-            Household(
+        household = Household(
                 size=size,
                 earned_income=float(value(FactId.EARNED_INCOME)),
                 unearned_income=float(value(FactId.UNEARNED_INCOME)),
@@ -157,8 +160,9 @@ class BudgetSolver(MultiAgentBase):
                 ),
                 max_allotment=constants.max_allotment(size),
                 minimum_benefit=constants.minimum_benefit(),
-            )
         )
+        state[HOUSEHOLD_KEY] = household
+        return compute(household)
 
     @staticmethod
     def _render_frontier(frontier: tuple) -> str:

@@ -85,10 +85,13 @@ def build_ledger_tools(ledger: FactLedger):
     return [record_fact]
 
 
-def build_elicitor(model: Model, ledger: FactLedger) -> Agent:
+def build_elicitor(model: Model, ledger: FactLedger, *, hooks=None,
+                   interventions=None) -> Agent:
     return Agent(
         model=model,
         tools=build_ledger_tools(ledger),
         system_prompt=SYSTEM_PROMPT,
+        hooks=hooks or [],
+        interventions=interventions or [],
         callback_handler=None,
     )

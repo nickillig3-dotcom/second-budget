@@ -109,18 +109,56 @@ class GraphDidNotConverge(RuntimeError):
     """The loop hit a limit instead of closing the frontier."""
 
 
-def run(graph, task: str, invocation_state: dict[str, Any]):
-    """Run the graph and refuse to treat a limit breach as success.
+class UnhandledInterrupt(RuntimeError):
+    """The graph paused for a human and no handler was supplied."""
 
-    ``result.failed_nodes`` is useless for this: it is an ``int`` and it is 0
-    when a limit stops the graph, so ``if result.failed_nodes:`` misses the case
-    entirely. Status is the only signal that carries it.
+
+def run(graph, task: str, invocation_state: dict[str, Any], *, on_interrupt=None,
+        max_resumes: int = 20):
+    """Run the graph to completion, pausing for a human whenever it asks.
+
+    A human gate inside a graph node surfaces as ``status = INTERRUPTED`` and a
+    list of interrupts on the result, exactly as it does for a bare agent. The
+    graph is resumed by invoking it again with ``interruptResponse`` blocks. That
+    loop lives here rather than in each caller, because forgetting it does not
+    look like a crash -- it looks like a graph that stopped early, and a caller
+    that treats the partial result as an answer would silently skip the human.
+
+    ``on_interrupt`` receives the interrupt's ``reason`` payload and returns the
+    response. Without one, an interrupt is an error rather than a silent
+    approval: nothing should be able to wave a confirmation gate through by
+    omission.
+
+    A limit breach is checked separately and cannot be confused with success:
+    ``result.failed_nodes`` is an ``int`` and is 0 when a limit stops the graph,
+    so ``if result.failed_nodes:`` misses it entirely. Status is the only signal
+    that carries it.
     """
-    result = graph(task, invocation_state)
-    if result.status is not Status.COMPLETED:
-        raise GraphDidNotConverge(
-            f"graph stopped with status={result.status.value} after "
-            f"{len(result.execution_order)} node runs "
-            f"(limit is {MAX_NODE_EXECUTIONS}); the fact frontier never closed"
-        )
-    return result
+    payload: Any = task
+    for _ in range(max_resumes):
+        result = graph(payload, invocation_state)
+
+        if result.status is Status.INTERRUPTED:
+            if on_interrupt is None:
+                raise UnhandledInterrupt(
+                    f"the graph paused for a human ({len(result.interrupts)} gate(s)) "
+                    f"and no on_interrupt handler was supplied"
+                )
+            payload = [
+                {"interruptResponse": {"interruptId": interrupt.id,
+                                       "response": on_interrupt(interrupt)}}
+                for interrupt in result.interrupts
+            ]
+            continue
+
+        if result.status is not Status.COMPLETED:
+            raise GraphDidNotConverge(
+                f"graph stopped with status={result.status.value} after "
+                f"{len(result.execution_order)} node runs "
+                f"(limit is {MAX_NODE_EXECUTIONS}); the fact frontier never closed"
+            )
+        return result
+
+    raise GraphDidNotConverge(
+        f"the graph asked for a human more than {max_resumes} times without finishing"
+    )

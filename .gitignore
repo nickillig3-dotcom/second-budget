@@ -23,3 +23,7 @@ notes/scratch/
 .bedrock-key
 .gh-token
 *credentials*
+
+# working files, not artefacts
+.second-budget-case.json
+request.md

@@ -55,7 +55,10 @@ def test_a_whole_batch_is_confirmed_in_one_interrupt() -> None:
     assert paused.stop_reason == "interrupt"
     assert len(paused.interrupts) == 1, "twelve facts must cost one gate, not twelve"
     interrupt = paused.interrupts[0]
-    assert interrupt.name == INTERRUPT_NAME
+    # The name carries a content hash of the batch: stable across a resume of
+    # the same batch, distinct between batches. A fixed name gave every round
+    # the same interrupt id, so one approval silently covered the next.
+    assert interrupt.name.startswith(INTERRUPT_NAME + ":")
     assert len(interrupt.reason["facts"]) == 12
     assert gate.batches_presented == 1
     # Nothing was written before a human saw it.
@@ -150,3 +153,23 @@ def test_the_halt_stays_out_of_the_way_while_facts_are_still_missing() -> None:
 
     assert halt.halted is False
     assert model.calls == 2
+
+
+def test_two_different_batches_get_two_different_gates() -> None:
+    """The bug this guards against.
+
+    ``BeforeToolsEvent`` derives the interrupt id from the NAME alone, and an id
+    that already carries a response is returned rather than raised. A fixed name
+    therefore lets a navigator's approval of one batch silently cover the next.
+    A counter does not fix it either: the hook re-runs on resume, so the same
+    batch would get a fresh id and the loop would never terminate.
+    """
+    from second_budget.control.hooks import _batch_key
+
+    first = {"facts": [{"fact_id": "household.size", "value": 2,
+                        "provenance": "from-narrative"}]}
+    second = {"facts": [{"fact_id": "household.size", "value": 3,
+                         "provenance": "from-narrative"}]}
+
+    assert _batch_key(first) == _batch_key(dict(first))   # stable across a resume
+    assert _batch_key(first) != _batch_key(second)        # distinct between batches

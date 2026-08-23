@@ -26,6 +26,8 @@ Two sharp edges, both measured:
 
 from __future__ import annotations
 
+import hashlib
+import json
 from typing import Any
 
 from strands.hooks import AfterToolsEvent, BeforeToolsEvent, HookProvider, HookRegistry
@@ -34,6 +36,19 @@ from ..facts import FactId, FactLedger, Provenance
 from ..frontier import is_closed
 
 INTERRUPT_NAME = "second-budget:confirm-fact-batch"
+
+
+def _batch_key(payload: dict) -> str:
+    """A stable short key for one batch of proposed facts.
+
+    Stable across a resume of the same batch, different between batches. See the
+    comment at the interrupt call for why both properties are required.
+    """
+    material = json.dumps(
+        [(f["fact_id"], f["value"], f["provenance"]) for f in payload["facts"]],
+        sort_keys=True, default=str,
+    )
+    return hashlib.sha1(material.encode("utf-8")).hexdigest()[:12]
 
 
 def _fact_calls(event: BeforeToolsEvent, tool_name: str) -> list[dict[str, Any]]:
@@ -70,6 +85,7 @@ class BatchConfirmation(HookProvider):
         self.navigator = navigator
         self.tool_name = tool_name
         self.batches_presented = 0
+        self.gates_paused = 0
         self.rejected: list[str] = []
 
     def register_hooks(self, registry: HookRegistry, **_: Any) -> None:
@@ -96,8 +112,27 @@ class BatchConfirmation(HookProvider):
             ],
         }
 
-        decision = event.interrupt(name=INTERRUPT_NAME, reason=payload)
+        # The interrupt name has to be derived from the batch's CONTENT, and
+        # getting this wrong twice is instructive.
+        #
+        # ``BeforeToolsEvent`` builds the interrupt id from the NAME alone
+        # (``hooks/events.py``: uuid5 over the name), and an id that already
+        # carries a response is returned rather than raised
+        # (``types/interrupt.py``). So a fixed name gives every round the same
+        # id, and a navigator's approval of the first batch silently covers the
+        # second -- measured: three rounds produced one distinct id.
+        #
+        # A counter does not fix it either. The hook re-runs when the graph
+        # resumes, so the counter has already moved on and the same batch gets a
+        # fresh id, raises again, and the loop never terminates.
+        #
+        # Hashing the proposed facts gives both properties at once: stable
+        # across the resume of one batch, distinct between batches.
+        decision = event.interrupt(
+            name=f"{INTERRUPT_NAME}:{_batch_key(payload)}", reason=payload
+        )
 
+        self.gates_paused += 1
         rejected = set(decision.get("rejected", []) if isinstance(decision, dict) else [])
         self.rejected.extend(sorted(rejected))
         if rejected:
