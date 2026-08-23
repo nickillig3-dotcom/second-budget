@@ -36,8 +36,9 @@ from strands.telemetry.metrics import EventLoopMetrics
 from strands.types.event_loop import Metrics, Usage
 
 from ..engine.budget import BudgetResult, Household, compute
-from ..engine.rounding import medical_deduction
 from ..engine.certificate import Certificate, certify
+from ..engine.constants import Constants, OutOfCoverage, for_state
+from ..engine.rounding import medical_deduction
 from ..facts import FactId, FactLedger
 from ..frontier import is_closed, missing_facts
 
@@ -47,6 +48,7 @@ CONSTANTS_KEY = "second_budget.constants"
 RESULT_KEY = "second_budget.result"
 FRONTIER_KEY = "second_budget.frontier"
 CERTIFICATE_KEY = "second_budget.certificate"
+REFUSAL_KEY = "second_budget.refusal"
 
 
 class InsufficientFacts(Exception):
@@ -89,7 +91,15 @@ class BudgetSolver(MultiAgentBase):
         if not is_closed(known):
             summary = self._render_frontier(frontier)
         else:
-            result = self._run_budget(ledger, state)
+            try:
+                result = self._run_budget(ledger, state)
+            except OutOfCoverage as refusal:
+                # A refusal is an answer, and a specific one. It names the
+                # constant, the jurisdiction and where the published figure
+                # lives, so a navigator learns something rather than hitting
+                # "unsupported".
+                state[REFUSAL_KEY] = refusal
+                return self._completed(f"REFUSED. {refusal}", started)
             state[RESULT_KEY] = result
             certificate: Certificate = certify(
                 result,
@@ -104,8 +114,12 @@ class BudgetSolver(MultiAgentBase):
     # -- internals --------------------------------------------------------
 
     def _run_budget(self, ledger: FactLedger, state: dict[str, Any]) -> BudgetResult:
-        constants = state.get(CONSTANTS_KEY) or {}
         value = ledger.value
+        # The constants come from the household's own facts, not from the
+        # caller. Anything else would let a wrong jurisdiction be passed in
+        # alongside a right one and produce a plausible answer.
+        constants: Constants = state.get(CONSTANTS_KEY) or for_state(str(value(FactId.STATE)))
+        state[CONSTANTS_KEY] = constants
         homeless = bool(value(FactId.HOMELESS_STATUS))
         shelter = 0.0 if homeless else (
             float(value(FactId.SHELTER_COST)) + float(value(FactId.UTILITY_ALLOWANCE))
@@ -117,26 +131,32 @@ class BudgetSolver(MultiAgentBase):
         # elicitor for a net figure keeps the rule in code -- a model that nets a
         # threshold in its head is computing, and computing is not its job.
         medical = (
-            medical_deduction(float(value(FactId.MEDICAL_EXPENSES)))
+            medical_deduction(
+                float(value(FactId.MEDICAL_EXPENSES)),
+                threshold=constants.medical_expense_threshold,
+            )
             if elderly_or_disabled
             else 0.0
         )
+        size = int(value(FactId.HOUSEHOLD_SIZE))
         return compute(
             Household(
-                size=int(value(FactId.HOUSEHOLD_SIZE)),
+                size=size,
                 earned_income=float(value(FactId.EARNED_INCOME)),
                 unearned_income=float(value(FactId.UNEARNED_INCOME)),
-                standard_deduction=float(constants.get("standard_deduction", 0.0)),
+                standard_deduction=float(constants.standard_deduction(size)),
                 dependent_care_expenses=float(value(FactId.DEPENDENT_CARE)),
                 medical_expenses=medical,
                 child_support_paid=float(value(FactId.CHILD_SUPPORT_PAID)),
                 shelter_expenses=shelter,
                 has_elderly_or_disabled_member=elderly_or_disabled,
                 homeless_receiving_standard_deduction=homeless,
-                homeless_shelter_deduction=float(constants.get("homeless_shelter_deduction", 0.0)),
-                shelter_cap=constants.get("shelter_cap"),
-                max_allotment=int(constants.get("max_allotment", 0)),
-                minimum_benefit=int(constants.get("minimum_benefit", 0)),
+                homeless_shelter_deduction=constants.homeless_shelter_deduction,
+                shelter_cap=constants.shelter_cap(
+                    has_elderly_or_disabled_member=elderly_or_disabled
+                ),
+                max_allotment=constants.max_allotment(size),
+                minimum_benefit=constants.minimum_benefit(),
             )
         )
 

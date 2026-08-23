@@ -196,12 +196,12 @@ def test_the_solver_node_applies_medical_eligibility_not_the_engine() -> None:
     import asyncio
 
     from second_budget.facts import Fact, FactId, FactLedger, Provenance
-    from second_budget.nodes.solver_node import CONSTANTS_KEY, LEDGER_KEY, RESULT_KEY, BudgetSolver
+    from second_budget.nodes.solver_node import LEDGER_KEY, RESULT_KEY, BudgetSolver
 
     def ledger_for(*, elderly: bool) -> FactLedger:
         ledger = FactLedger()
         for fact_id, value in (
-            (FactId.HOUSEHOLD_SIZE, 2), (FactId.STATE, "IL"),
+            (FactId.HOUSEHOLD_SIZE, 2), (FactId.STATE, "Ohio"),
             (FactId.BENEFIT_MONTH, "2024-06"), (FactId.EARNED_INCOME, 1200.0),
             (FactId.UNEARNED_INCOME, 0.0), (FactId.ELDERLY_OR_DISABLED, elderly),
             (FactId.CHILD_SUPPORT_PAID, 0.0), (FactId.DEPENDENT_CARE, 0.0),
@@ -213,12 +213,7 @@ def test_the_solver_node_applies_medical_eligibility_not_the_engine() -> None:
         return ledger
 
     def run_solver(*, elderly: bool):
-        state = {
-            LEDGER_KEY: ledger_for(elderly=elderly),
-            CONSTANTS_KEY: {"standard_deduction": 204.0, "shelter_cap": 672.0,
-                            "max_allotment": 535, "minimum_benefit": 23,
-                            "homeless_shelter_deduction": 180.0},
-        }
+        state = {LEDGER_KEY: ledger_for(elderly=elderly)}
         asyncio.run(BudgetSolver().invoke_async("go", state))
         return state[RESULT_KEY]
 

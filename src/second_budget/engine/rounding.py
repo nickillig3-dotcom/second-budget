@@ -89,7 +89,9 @@ def household_share(net_income: float) -> int:
     return math.ceil(0.30 * net_income)
 
 
-def medical_deduction(gross_medical_expenses: float) -> float:
+def medical_deduction(
+    gross_medical_expenses: float, *, threshold: float = MEDICAL_THRESHOLD
+) -> float:
     """The deductible part of a household's medical expenses.
 
     Only the amount **above $35 a month** is deductible, and only for elderly or
@@ -108,4 +110,4 @@ def medical_deduction(gross_medical_expenses: float) -> float:
     >>> medical_deduction(30)
     0.0
     """
-    return max(0.0, gross_medical_expenses - MEDICAL_THRESHOLD)
+    return max(0.0, gross_medical_expenses - threshold)

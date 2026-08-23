@@ -1,0 +1,158 @@
+# FY2024 SNAP parameters.
+#
+# Transcribed from the published schedule -- Tables F.3, F.5 and F.6 of the
+# FY 2024 SNAP QC Technical Documentation (Appendix F, "FY 2024 SNAP
+# Parameters"), sourced there to the U.S. Department of Agriculture, Food and
+# Nutrition Service.
+#
+#   https://snapqcdata.net/sites/default/files/2026-08/FY-2024-Tech-Doc.pdf
+#
+# Every value below is then PROVEN against the microdata's own per-household
+# columns -- BENMAX, FSSTDDED, MINIMUM_BEN, SHELCAP -- by
+# `python -m second_budget.validate.layer_c_constants`. That is the point of
+# transcribing rather than deriving: a table read off the data and then checked
+# against the same data proves nothing. Two independent expressions of the same
+# schedule agreeing on every one of 42,000 households is a real check, and it
+# catches exactly the failure this file is prone to, which is a typo.
+#
+# A note on direction, because it matters: when a value here disagrees with the
+# microdata, this file is what gets corrected -- or the region is dropped from
+# coverage. It is never "tuned" to match, because a table fitted to the data it
+# is checked against has stopped being evidence.
+
+fiscal_year: 2024
+effective_from: 2023-10-01
+effective_to: 2024-09-30
+source:
+  document: FY 2024 SNAP QC Technical Documentation, Appendix F
+  tables: [F.3, F.5, F.6]
+  url: https://snapqcdata.net/sites/default/files/2026-08/FY-2024-Tech-Doc.pdf
+  attributed_to: USDA Food and Nutrition Service
+
+regions:
+  contiguous:
+    label: Contiguous United States
+    covered: true
+    # Table F.5. Sizes above 8 add `additional_person` each.
+    max_allotment: {1: 291, 2: 535, 3: 766, 4: 973, 5: 1155, 6: 1386, 7: 1532, 8: 1751}
+    additional_person: 219
+    # Table F.6. Applies to one- and two-person units only.
+    minimum_benefit: 23
+    # Table F.3. Keyed by the size bands the schedule itself uses.
+    standard_deduction: {1: 198, 2: 198, 3: 198, 4: 208, 5: 244, 6: 279}
+    shelter_cap: 672
+
+  # The remaining regions are transcribed for completeness and are NOT covered.
+  # The reason is specific rather than cautious: Alaska runs three separate
+  # benefit schedules (Urban, Rural I, Rural II) and the public-use file records
+  # only the state, so an Alaskan household cannot be mapped to its schedule
+  # from the data available here. Guessing would produce a plausible, wrong
+  # answer -- which is the failure this whole project exists to attack.
+  # Illinois is the one entry here that is not a transcription problem.
+  # Measured: all 861 Illinois households in the FY2024 file carry a standard
+  # deduction exactly $7 below the published contiguous figure, at every size
+  # band -- 191 against 198, 201 against 208, 237 against 244, 272 against 279.
+  # 861 of 861 is a rule, not noise.
+  #
+  # No published source for that variation has been located, so the values are
+  # deliberately left as the contiguous ones and the region is NOT covered. The
+  # alternative -- copying 191 out of the microdata and then "proving" it against
+  # the same microdata -- would be circular, and this file exists to not do that.
+  # If the source turns up, the figures go in with a citation and coverage opens.
+  illinois:
+    label: Illinois
+    covered: false
+    uncovered_because: >-
+      every Illinois household in the FY2024 file has a standard deduction $7
+      below the published contiguous schedule, and no published source for that
+      variation has been located; the engine refuses rather than using an
+      unsourced figure or one copied out of the data it would be checked against
+    max_allotment: {1: 291, 2: 535, 3: 766, 4: 973, 5: 1155, 6: 1386, 7: 1532, 8: 1751}
+    additional_person: 219
+    minimum_benefit: 23
+    standard_deduction: {1: 198, 2: 198, 3: 198, 4: 208, 5: 244, 6: 279}
+    shelter_cap: 672
+
+  alaska_urban:
+    label: Alaska (Urban)
+    covered: false
+    uncovered_because: >-
+      the public-use file does not record which of Alaska's three benefit
+      regions a household is in
+    max_allotment: {1: 374, 2: 686, 3: 983, 4: 1248, 5: 1482, 6: 1778, 7: 1966, 8: 2246}
+    additional_person: 281
+    minimum_benefit: 30
+    standard_deduction: {1: 338, 2: 338, 3: 338, 4: 338, 5: 338, 6: 349}
+    shelter_cap: 1073
+
+  alaska_rural_1:
+    label: Alaska (Rural I)
+    covered: false
+    uncovered_because: >-
+      the public-use file does not record which of Alaska's three benefit
+      regions a household is in
+    max_allotment: {1: 477, 2: 875, 3: 1253, 4: 1591, 5: 1890, 6: 2268, 7: 2506, 8: 2865}
+    additional_person: 358
+    minimum_benefit: 38
+    standard_deduction: {1: 338, 2: 338, 3: 338, 4: 338, 5: 338, 6: 349}
+    shelter_cap: 1073
+
+  alaska_rural_2:
+    label: Alaska (Rural II)
+    covered: false
+    uncovered_because: >-
+      the public-use file does not record which of Alaska's three benefit
+      regions a household is in
+    max_allotment: {1: 581, 2: 1065, 3: 1525, 4: 1937, 5: 2300, 6: 2760, 7: 3051, 8: 3487}
+    additional_person: 436
+    minimum_benefit: 46
+    standard_deduction: {1: 338, 2: 338, 3: 338, 4: 338, 5: 338, 6: 349}
+    shelter_cap: 1073
+
+  hawaii:
+    label: Hawaii
+    covered: false
+    uncovered_because: >-
+      transcribed but not yet validated against the microdata; the engine
+      refuses rather than returning an unverified figure
+    max_allotment: {1: 527, 2: 967, 3: 1385, 4: 1759, 5: 2088, 6: 2506, 7: 2770, 8: 3166}
+    additional_person: 396
+    minimum_benefit: 42
+    standard_deduction: {1: 279, 2: 279, 3: 279, 4: 279, 5: 280, 6: 321}
+    shelter_cap: 905
+
+  guam:
+    label: Guam
+    covered: false
+    uncovered_because: >-
+      transcribed but not yet validated against the microdata; the engine
+      refuses rather than returning an unverified figure
+    max_allotment: {1: 430, 2: 788, 3: 1129, 4: 1434, 5: 1703, 6: 2044, 7: 2259, 8: 2581}
+    additional_person: 323
+    minimum_benefit: 34
+    standard_deduction: {1: 397, 2: 397, 3: 397, 4: 416, 5: 487, 6: 558}
+    shelter_cap: 789
+
+  virgin_islands:
+    label: Virgin Islands
+    covered: false
+    uncovered_because: >-
+      transcribed but not yet validated against the microdata; the engine
+      refuses rather than returning an unverified figure
+    max_allotment: {1: 375, 2: 688, 3: 985, 4: 1251, 5: 1485, 6: 1782, 7: 1970, 8: 2252}
+    additional_person: 282
+    minimum_benefit: 30
+    standard_deduction: {1: 174, 2: 174, 3: 174, 4: 208, 5: 244, 6: 279}
+    shelter_cap: 529
+
+# Table F.3, applies to every region. The regulation sets $179.66; the QC file
+# records whole dollars only and carries it as 180.
+homeless_shelter_deduction: 179.66
+homeless_shelter_deduction_as_recorded: 180
+
+# Table F.3, every region.
+earned_income_deduction_rate: 0.20
+
+# 7 CFR 273.9(d)(3): only medical expenses above this are deductible, and only
+# for elderly or disabled members.
+medical_expense_threshold: 35

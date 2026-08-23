@@ -21,20 +21,11 @@ from second_budget.nodes.graph import (
     frontier_still_open,
     run,
 )
-from second_budget.nodes.solver_node import (
-    CONSTANTS_KEY,
-    LEDGER_KEY,
-    RESULT_KEY,
-    BudgetSolver,
-)
+from second_budget.nodes.solver_node import LEDGER_KEY, RESULT_KEY, BudgetSolver
 
-CONSTANTS = {
-    "standard_deduction": 204.0,
-    "shelter_cap": 672.0,
-    "max_allotment": 535,
-    "minimum_benefit": 23,
-    "homeless_shelter_deduction": 180.0,
-}
+# No constants are passed in. The engine resolves them from the household's own
+# recorded state, which is the only way a wrong jurisdiction cannot be supplied
+# alongside a right one.
 
 
 def _fact(fact_id: FactId, value, provenance=Provenance.FROM_NARRATIVE):
@@ -51,7 +42,7 @@ def _fact(fact_id: FactId, value, provenance=Provenance.FROM_NARRATIVE):
 #: cannot express that; a cycle can.
 ROUND_ONE = [
     _fact(FactId.HOUSEHOLD_SIZE, 2),
-    _fact(FactId.STATE, "IL"),
+    _fact(FactId.STATE, "Ohio"),
     _fact(FactId.BENEFIT_MONTH, "2024-06"),
     _fact(FactId.EARNED_INCOME, 1200.0),
 ]
@@ -84,7 +75,7 @@ def _converging_graph():
         drafter=Agent(model=drafter_model, callback_handler=None),
         engine=engine,
     )
-    state = {LEDGER_KEY: ledger, CONSTANTS_KEY: CONSTANTS}
+    state = {LEDGER_KEY: ledger}
     return graph, state, ledger, engine, elicitor_model
 
 
@@ -147,7 +138,7 @@ def test_a_loop_that_never_converges_is_reported_not_silently_accepted() -> None
         drafter=Agent(model=ScriptedModel([Turn.say("never reached")]), callback_handler=None),
     )
     with pytest.raises(GraphDidNotConverge) as caught:
-        run(graph, "go", {LEDGER_KEY: ledger, CONSTANTS_KEY: CONSTANTS})
+        run(graph, "go", {LEDGER_KEY: ledger})
     assert "never closed" in str(caught.value)
 
 
@@ -166,7 +157,7 @@ def test_the_edge_conditions_are_pure_and_complementary() -> None:
     assert len(ledger) == 0  # nothing was mutated by asking
 
     for fact_id, value in (
-        (FactId.HOUSEHOLD_SIZE, 2), (FactId.STATE, "IL"), (FactId.BENEFIT_MONTH, "2024-06"),
+        (FactId.HOUSEHOLD_SIZE, 2), (FactId.STATE, "Ohio"), (FactId.BENEFIT_MONTH, "2024-06"),
         (FactId.EARNED_INCOME, 1200.0), (FactId.UNEARNED_INCOME, 0.0),
         (FactId.ELDERLY_OR_DISABLED, False), (FactId.CHILD_SUPPORT_PAID, 0.0),
         (FactId.DEPENDENT_CARE, 0.0), (FactId.HOMELESS_STATUS, False),
