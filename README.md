@@ -8,10 +8,10 @@ honest answer is that nobody checks. Second Budget re-derives the allotment from
 the underlying facts, and when it disagrees it says **which stage** of the budget
 it disagrees with and by how much, with the regulation quoted verbatim.
 
-**Status: in progress.** The calculation engine, its validation against federal
-microdata, and the agent orchestration are built and measured. Still to come: the
-disagreement report and the fair-hearing packet. Every number below is
-reproducible from this repository.
+**Status: in progress.** The engine, its validation against federal microdata,
+the agent orchestration, the disagreement report and the regulation index are
+built and measured. Still to come: the rendered fair-hearing packet and a CLI.
+Every number below is reproducible from this repository.
 
 ## What is proven, not asserted
 
@@ -215,6 +215,87 @@ The agent loop is exercised by a real Strands `Model` implementation
 (`models/scripted.py`) that replays a script rather than calling a provider — so
 graph topology, interventions, interrupts and the exact model-call count are all
 assertable offline.
+
+## What it produces
+
+A notice of action gives a household one number and does not show the budget
+behind it. So the report does not claim to know which stage the agency got wrong
+-- a single final figure cannot support that. It answers the question a single
+figure *can* answer:
+
+> For this notice to be correct, what would have to be true about this household
+> that the household says is not true?
+
+The budget is monotone in every input, so for each one there is at most one value
+that reconciles the two figures, and it is found exactly. A real run:
+
+```
+The notice says $210. The engine derives $473.
+Difference: $263 a month in the household's favour.
+
+For the notice to be correct, one of these would have to be true:
+  * unearned income is $584.41 higher than stated  -- 7 CFR 273.9(b)
+  * earned income is $728.71 higher than stated    -- 7 CFR 273.9(b)
+```
+
+Shelter costs and the medical deduction are absent from that list because they
+**cannot** explain the gap: driven all the way to zero they move the allotment
+from $473 to $313, short of $210. An explanation that does not reconcile is
+dropped rather than printed as a large number, and every line is checked by
+feeding the required value back through the engine and requiring the agency's
+figure to come out.
+
+A reconciliation is not an accusation. The agency may hold facts the household
+did not mention, and the household may be misremembering. The report says what
+would have to be true and stops there.
+
+## Quotations are literal, or they are refused
+
+Every regulation quoted in a filing must be a **byte-identical span** of the
+section it cites. An agency representative at a hearing looks the citation up and
+reads it back; a quotation smoothed into better English is not a small error, it
+is a reason to dismiss the document.
+
+`CitationGate` normalises whitespace and then asks whether the quoted text is a
+substring of the published section. Decidable, and unit-tested in both
+directions: a paraphrase of the earned-income rule is denied, the verbatim span
+is allowed, and line wrapping is correctly not treated as paraphrase.
+
+### Why the citations are section-level
+
+The obvious target was `7 CFR 273.10(e)(2)(ii)(C)` rather than `7 CFR 273.10`.
+eCFR does not publish paragraph paths: it ships a flat list of `<P>` elements
+whose only clue to depth is the marker each one opens with. In principle the path
+is recoverable from the four alternating marker alphabets. In practice two things
+defeat it -- eCFR packs several levels into one element, as in
+`(e) Calculating net income-(1) Net monthly income. (i) To determine...`, and
+`(i)` is both a lower letter and the first roman numeral, disambiguated only by
+the depth being reconstructed.
+
+Two rounds of heuristics still produced **187 duplicate citations across 2,418
+paragraphs** -- roughly eight percent of paths wrong. A wrong citation in a legal
+filing is worse than a coarse one, so the index uses the section, which eCFR
+gives explicitly as an attribute and which therefore cannot be wrong. The
+`collisions()` function and a test keep that measurement reproducible rather than
+asking you to take it on trust.
+
+The property that matters is untouched: the citation is coarser, the quotation is
+exact, and the quotation is what an advocate argues from.
+
+### The regulation index fails closed
+
+`MemoryManager.search` catches a store's exception and returns an empty list
+(`memory/memory_manager.py:353`), so a dead index and a regulation that says
+nothing are indistinguishable to both the agent and the caller. "No rule requires
+that", produced by a broken lookup, is the worst available outcome here.
+
+Three seams answer it: a startup canary in `initialize()` -- the one hook in the
+memory path that is not guarded, so a raise there aborts agent construction -- a
+per-search latch for a backend that dies mid-case, and a health assertion before
+any quotation is allowed through. Connections are thread-local with
+`check_same_thread` left **on**, because Strands runs the constructor,
+`initialize` and each search on three different threads, and the guard is what
+would have reported that.
 
 ## Coverage
 

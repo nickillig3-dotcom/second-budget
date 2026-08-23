@@ -136,3 +136,87 @@ class InferredFactGate(InterventionHandler):
             reason={"fact_id": fact_id, "value": payload.get("value"),
                     "provenance": Provenance.INFERRED.value},
         )
+
+
+class CitationGate(InterventionHandler):
+    """A quotation must be a literal span of the section it cites.
+
+    This is the difference between an anti-hallucination gate and the appearance
+    of one. A check that the citation field is non-empty stops nothing; this
+    normalises whitespace and asks whether the quoted text is a **substring** of
+    the published section. Set membership again, in a different clothing:
+    decidable, unit-testable, and impossible to talk around.
+
+    It matters because of who reads the output. An agency representative at a
+    fair hearing looks the cited paragraph up and reads it back. A quotation that
+    has been smoothed into better English is not a small error -- it is a reason
+    to dismiss the filing, and it costs the household the appeal.
+
+    The store is asked whether it is healthy before any quotation is allowed
+    through, because a silently empty regulation index would otherwise let every
+    quote fail for the same reason and produce a document full of denials that
+    look like the model's fault.
+    """
+
+    name = "quotes-must-be-verbatim"
+
+    def __init__(self, store: Any, *, guarded_tools: frozenset[str],
+                 citation_field: str = "citation", quote_field: str = "quote") -> None:
+        self.store = store
+        self.guarded_tools = guarded_tools
+        self.citation_field = citation_field
+        self.quote_field = quote_field
+        self.denials: list[tuple[str, str]] = []
+
+    @property
+    def on_error(self) -> OnError:
+        return "deny"
+
+    @staticmethod
+    def _normalise(text: str) -> str:
+        return " ".join(text.split())
+
+    def before_tool_call(self, event: Any, **_: Any) -> InterventionAction:
+        tool_use = event.tool_use
+        if tool_use.get("name") not in self.guarded_tools:
+            return Proceed()
+
+        payload = tool_use.get("input", {})
+        quote = payload.get(self.quote_field)
+        if not quote:
+            return Proceed()
+
+        # A lookup that failed earlier makes every later quote unverifiable.
+        self.store.assert_healthy()
+
+        citation = str(payload.get(self.citation_field, "")).strip()
+        if not citation:
+            self.denials.append(("", str(quote)[:80]))
+            return Deny(
+                reason=(
+                    "a quotation needs the citation it came from. Name the section, "
+                    f"for example '7 CFR 273.9', in the '{self.citation_field}' field."
+                )
+            )
+
+        source = self.store.section_text(citation)
+        if source is None:
+            self.denials.append((citation, str(quote)[:80]))
+            return Deny(
+                reason=(
+                    f"{citation!r} is not a section of 7 CFR 273 in the index. "
+                    f"Cite one of: {', '.join(self.store.citations()[:6])}, ..."
+                )
+            )
+
+        if self._normalise(str(quote)) not in self._normalise(source):
+            self.denials.append((citation, str(quote)[:80]))
+            return Deny(
+                reason=(
+                    f"that text is not a literal span of {citation}; it was "
+                    f"paraphrased. Quote the regulation word for word, or quote a "
+                    f"shorter span that you can reproduce exactly."
+                )
+            )
+
+        return Proceed()
