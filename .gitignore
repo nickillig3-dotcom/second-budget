@@ -1,0 +1,19 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+*.duckdb
+*.duckdb.wal
+data/cache/
+data/qc/
+data/corpus/
+
+notes/scratch/
+
+# Never. Credentials live outside the repo, in zugang/, and are read from the
+# environment. Nothing key-shaped is allowed to become a tracked file.
+*.key
+.bedrock-key
+.gh-token
+*credentials*
